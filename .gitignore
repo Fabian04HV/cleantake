@@ -9,6 +9,7 @@ node_modules/
 # Uploaded user files
 uploads/
 server/uploads/
+server/exports/
 
 # Build output
 dist/

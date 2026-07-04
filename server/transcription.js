@@ -15,5 +15,30 @@ export async function transcribeAudio(filePath) {
     }
   );
 
-  return response.results?.channels?.[0]?.alternatives?.[0]?.transcript || "";
+  
+  const alternative = response.results?.channels?.[0]?.alternatives?.[0];
+
+  return {
+    transcript: alternative?.transcript || "",
+    words: alternative?.words || [],
+  };
+}
+
+export function findSilencesFromWords(words) {
+  const silences = [];
+
+  const threshold = 0.5
+  const padding = 0.1
+
+  for(let i = 0; i < words.length - 1; i++) {
+
+    if(words[i].end + threshold < words[i + 1].start){
+      silences.push({
+        start: words[i].end + padding,
+        end: words[i + 1].start - padding
+      })
+    }
+  }
+
+  return silences
 }

@@ -2,13 +2,15 @@ import express from "express";
 import cors from "cors";
 
 import { uploadAudio, getAudioUrl } from "./audioUpload.js";
-import { transcribeAudio } from "./transcription.js";
+import { findSilencesFromWords, transcribeAudio } from "./transcription.js";
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use("/uploads", express.static("uploads"));
+app.use("/exports", express.static("exports"))
+app.use(express.json())
 
 app.post("/api/upload", uploadAudio, async (req, res) => {
 
@@ -20,13 +22,15 @@ app.post("/api/upload", uploadAudio, async (req, res) => {
 
   try {
     const transcript = await transcribeAudio(req.file.path);
+    console.log("WORDS: ", transcript.words);
 
     res.json({
       message: "File uploaded and transcribed",
       file: {
         ...req.file,
         url: getAudioUrl(req.file.filename),
-        transcript,
+        transcript: transcript.transcript,
+        words: transcript.words,
       },
     });
   } 
@@ -38,6 +42,13 @@ app.post("/api/upload", uploadAudio, async (req, res) => {
     });
   }
 });
+
+app.post("/api/remove-silences", (req, res) => {
+  const { words, path } = req.body 
+  
+  const silences = findSilencesFromWords(words)
+  
+})
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

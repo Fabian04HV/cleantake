@@ -5,6 +5,7 @@ function App() {
   const [uploadedAudio, setUploadedAudio] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
+
   const handleUpload = async (file) => {
 
     if (!file) {
@@ -15,6 +16,7 @@ function App() {
     setIsUploading(true); 
     const formData = new FormData();
     formData.append('audio', file);
+    
 
     try {
       const response = await fetch('http://localhost:3000/api/upload', {
@@ -36,6 +38,24 @@ function App() {
     }
   };
 
+  const handleRemoveSilences = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/remove-silences', {
+        method: 'POST',
+        body: JSON.stringify({
+          path: uploadedAudio.path,
+          words: uploadedAudio.words
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+
   return (
     <div className="App">
       <header>
@@ -50,7 +70,7 @@ function App() {
         {isUploading && <p>Uploading...</p>}
       </header>
       <aside className="controls">
-        <button>Remove Silences</button>
+        <button onClick={handleRemoveSilences}>Remove Silences</button>
         <button>Remove Retakes</button>
         <button className="cta">Export Audio</button>
       </aside>
