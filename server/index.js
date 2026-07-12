@@ -2,7 +2,8 @@ import express from "express";
 import cors from "cors";
 
 import { uploadAudio, getAudioUrl } from "./audioUpload.js";
-import { findSilencesFromWords, transcribeAudio } from "./transcription.js";
+import { transcribeAudio } from "./transcription.js";
+import { cutSilences, findSilencesFromWords, getKeepSegments } from "./audioEditing.js";
 
 const app = express();
 const PORT = 3000;
@@ -43,10 +44,34 @@ app.post("/api/upload", uploadAudio, async (req, res) => {
   }
 });
 
-app.post("/api/remove-silences", (req, res) => {
+app.post("/api/remove-silences", async (req, res) => {
   const { words, path } = req.body 
   
   const silences = findSilencesFromWords(words)
+  const duration = words[words.length - 1]?.end ?? 0;
+  const keepSegments = getKeepSegments(silences, duration);
+
+  const outputFilename = `cleaned-${Date.now()}.mp3`;
+  const outputPath = `exports/${outputFilename}`;
+
+  try {
+    await cutSilences(path, keepSegments, outputPath);
+    res.json({
+      silences,
+      url: `http://localhost:3000/exports/${outputFilename}`,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to cut silences" });
+  }
+})
+
+app.post("/api/remove-retakes", async (req, res) => {
+  const { words, path } = req.body
+  
+  const retakes = findRetakesFromWords(words)
+  const duration = words[words.length - 1]?.end ?? 0;
+  const keepSegments = getKeepSegments(retakes, duration);
   
 })
 

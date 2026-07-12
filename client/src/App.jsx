@@ -4,7 +4,8 @@ function App() {
 
   const [uploadedAudio, setUploadedAudio] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-
+  const [processedAudio, setProcessedAudio] = useState(null);
+  const [isRemovingSilences, setIsRemovingSilences] = useState(false);
 
   const handleUpload = async (file) => {
 
@@ -39,6 +40,12 @@ function App() {
   };
 
   const handleRemoveSilences = async () => {
+    if (!uploadedAudio) {
+      alert('Please upload an audio file first');
+      return;
+    }
+
+    setIsRemovingSilences(true);
     try {
       const response = await fetch('http://localhost:3000/api/remove-silences', {
         method: 'POST',
@@ -49,12 +56,24 @@ function App() {
         headers: { 'Content-Type': 'application/json' }
       })
 
+      const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error('Failed to remove silences');
+      }
+
+      setProcessedAudio(data);
     } catch (error) {
+      alert('Failed to remove silences');
       console.error(error)
+    } finally {
+      setIsRemovingSilences(false);
     }
   }
 
+  const handleRemoveRetakes = async () => {
+    
+  }
 
   return (
     <div className="App">
@@ -70,7 +89,9 @@ function App() {
         {isUploading && <p>Uploading...</p>}
       </header>
       <aside className="controls">
-        <button onClick={handleRemoveSilences}>Remove Silences</button>
+        <button onClick={handleRemoveSilences} disabled={!uploadedAudio || isRemovingSilences}>
+          {isRemovingSilences ? 'Removing Silences...' : 'Remove Silences'}
+        </button>
         <button>Remove Retakes</button>
         <button className="cta">Export Audio</button>
       </aside>
@@ -80,7 +101,21 @@ function App() {
         <p className="transcript">{uploadedAudio.transcript}</p>
       </>)}
       </main>
-      
+      {processedAudio && (
+        <section className="editor">
+          <h2>Compare</h2>
+          <div className="audio-compare">
+            <div className="audio-compare-item">
+              <h3>Before</h3>
+              <audio src={uploadedAudio.url} controls />
+            </div>
+            <div className="audio-compare-item">
+              <h3>Silences Removed</h3>
+              <audio src={processedAudio.url} controls />
+            </div>
+          </div>
+        </section>
+      )}
   </div>
 );
 }

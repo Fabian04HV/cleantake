@@ -24,21 +24,3 @@ export async function transcribeAudio(filePath) {
   };
 }
 
-export function findSilencesFromWords(words) {
-  const silences = [];
-
-  const threshold = 0.5
-  const padding = 0.1
-
-  for(let i = 0; i < words.length - 1; i++) {
-
-    if(words[i].end + threshold < words[i + 1].start){
-      silences.push({
-        start: words[i].end + padding,
-        end: words[i + 1].start - padding
-      })
-    }
-  }
-
-  return silences
-}
