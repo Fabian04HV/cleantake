@@ -1,17 +1,25 @@
 import express from "express";
 import cors from "cors";
+import { existsSync } from "fs";
 
-import { uploadAudio, getAudioUrl } from "./audioUpload.js";
+import { uploadAudio, getAudioUrl, resolveUploadPath } from "./audioUpload.js";
 import { transcribeAudio } from "./transcription.js";
-import { cutSilences, findSilencesFromWords, getKeepSegments } from "./audioEditing.js";
+import {
+  findSilencesFromWords,
+  getKeepSegments,
+  normalizeExcludedSegments,
+  renderKeepSegments,
+  getAudioDuration,
+} from "./audioEditing.js";
+import { findRetakesFromWords } from "./retakeDetection.js";
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use("/uploads", express.static("uploads"));
-app.use("/exports", express.static("exports"))
-app.use(express.json())
+app.use("/exports", express.static("exports"));
+app.use(express.json());
 
 app.post("/api/upload", uploadAudio, async (req, res) => {
 
@@ -44,18 +52,22 @@ app.post("/api/upload", uploadAudio, async (req, res) => {
   }
 });
 
+// Physically renders a silence-free copy of the file for the "before/after"
+// comparison player. This is a separate, submission-based feature and stays
+// untouched by the non-destructive retake editor below.
 app.post("/api/remove-silences", async (req, res) => {
-  const { words, path } = req.body 
-  
+  const { words, path } = req.body
+
   const silences = findSilencesFromWords(words)
   const duration = words[words.length - 1]?.end ?? 0;
-  const keepSegments = getKeepSegments(silences, duration);
+  const excludedSegments = normalizeExcludedSegments(silences, duration);
+  const keepSegments = getKeepSegments(excludedSegments, duration);
 
   const outputFilename = `cleaned-${Date.now()}.mp3`;
   const outputPath = `exports/${outputFilename}`;
 
   try {
-    await cutSilences(path, keepSegments, outputPath);
+    await renderKeepSegments(path, keepSegments, outputPath);
     res.json({
       silences,
       url: `http://localhost:3000/exports/${outputFilename}`,
@@ -66,14 +78,70 @@ app.post("/api/remove-silences", async (req, res) => {
   }
 })
 
+// Detection only: figures out which word/time ranges are likely retakes, but
+// never touches the audio file itself. The frontend keeps its own editable
+// "excluded" state and only calls /api/export-audio once the user is happy
+// with their selection.
 app.post("/api/remove-retakes", async (req, res) => {
-  const { words, path } = req.body
-  
-  const retakes = findRetakesFromWords(words)
-  const duration = words[words.length - 1]?.end ?? 0;
-  const keepSegments = getKeepSegments(retakes, duration);
-  
-})
+  try {
+    const { words } = req.body;
+
+    if (!Array.isArray(words) || words.length === 0) {
+      return res.status(400).json({
+        error: "No transcript words provided"
+      });
+    }
+
+    const retakes = findRetakesFromWords(words);
+
+    return res.json({
+      retakes
+    });
+  } catch (error) {
+    console.error("Retake detection failed:", error);
+
+    return res.status(500).json({
+      error: "Failed to detect retakes"
+    });
+  }
+});
+
+// Renders the final, edited audio file: everything the client marked as
+// excluded gets cut out with FFmpeg, the original upload is never modified.
+app.post("/api/export-audio", async (req, res) => {
+  try {
+    const { path, excludedSegments } = req.body;
+
+    const resolvedPath = resolveUploadPath(path);
+    if (!resolvedPath || !existsSync(resolvedPath)) {
+      return res.status(400).json({ error: "Invalid audio file path" });
+    }
+
+    if (!Array.isArray(excludedSegments)) {
+      return res.status(400).json({ error: "excludedSegments must be an array" });
+    }
+
+    const duration = await getAudioDuration(resolvedPath);
+    const normalizedExcluded = normalizeExcludedSegments(excludedSegments, duration);
+    const keepSegments = getKeepSegments(normalizedExcluded, duration);
+
+    if (keepSegments.length === 0) {
+      return res.status(400).json({
+        error: "Removing all selected segments would leave no audio behind",
+      });
+    }
+
+    const outputFilename = `export-${Date.now()}.mp3`;
+    const outputPath = `exports/${outputFilename}`;
+
+    await renderKeepSegments(resolvedPath, keepSegments, outputPath);
+
+    return res.download(outputPath, "clean-take.mp3");
+  } catch (error) {
+    console.error("Audio export failed:", error);
+    return res.status(500).json({ error: "Failed to export audio" });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

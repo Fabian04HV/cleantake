@@ -104,6 +104,52 @@ audio::-webkit-media-controls-panel {
   line-height: 1.8;
 }
 
+.transcript-hint {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.transcript-word {
+  cursor: text;
+  user-select: text;
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.1rem;
+}
+
+.transcript-word--excluded {
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+
+.selection-toolbar {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem;
+  background-color: var(--surface-color);
+  border: 1px solid var(--line-color);
+  border-radius: var(--radius);
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.25);
+}
+
+.selection-toolbar button {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.selection-toolbar__close {
+  background: transparent;
+  color: var(--text-color);
+  padding: 0.35rem 0.5rem;
+}
+
+.selection-toolbar__close:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
 aside.controls {
   grid-area: aside;
   display: flex;
