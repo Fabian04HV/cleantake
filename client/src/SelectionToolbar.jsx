@@ -1,12 +1,17 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Icon from './Icon.jsx';
+import contentCutIconSvg from './icons/content_cut_24dp_E3E3E3_FILL0_wght300_GRAD0_opsz24.svg?raw';
+import undoIconSvg from './icons/undo_24dp_E3E3E3_FILL0_wght300_GRAD0_opsz24.svg?raw';
 
 const VIEWPORT_MARGIN = 8;
 
 // Small contextual toolbar shown near the current text selection. Rendered
 // through a portal so it is never clipped by the transcript container, and
 // self-measures once mounted so it can clamp itself inside the viewport.
-function SelectionToolbar({ selection, onExclude, onInclude, onClose }) {
+// There is no explicit close button - Escape, clicking outside, or choosing
+// an action all already dismiss it (see App/TranscriptEditor/WaveformEditor).
+function SelectionToolbar({ selection, onExclude, onInclude }) {
   const toolbarRef = useRef(null);
   const [position, setPosition] = useState(null);
 
@@ -53,23 +58,27 @@ function SelectionToolbar({ selection, onExclude, onInclude, onClose }) {
       onMouseDown={(event) => event.preventDefault()}
     >
       {canExclude && (
-        <button type="button" onClick={onExclude}>
-          Remove from audio
+        <button
+          type="button"
+          className="selection-action-button selection-action-button--remove"
+          onClick={onExclude}
+          aria-label="Remove selected audio"
+          title="Remove selected audio"
+        >
+          <Icon svg={contentCutIconSvg} />
         </button>
       )}
       {canInclude && (
-        <button type="button" onClick={onInclude}>
-          Restore audio
+        <button
+          type="button"
+          className="selection-action-button selection-action-button--restore"
+          onClick={onInclude}
+          aria-label="Restore selected audio"
+          title="Restore selected audio"
+        >
+          <Icon svg={undoIconSvg} />
         </button>
       )}
-      <button
-        type="button"
-        className="selection-toolbar__close"
-        aria-label="Dismiss selection actions"
-        onClick={onClose}
-      >
-        ×
-      </button>
     </div>,
     document.body
   );

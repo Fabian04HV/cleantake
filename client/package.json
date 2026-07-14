@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/utils/audioSegments.test.js src/utils/timelineMapping.test.js src/utils/transcriptTiming.test.js"
   },
   "dependencies": {
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "wavesurfer.js": "^7.12.10"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,12 +1,43 @@
 :root {
-  --background-color: #d9d9d9;
-  --surface-color: #f5f5f5;
-  --text-color: #21222c;
-  --button-color: #47497d;
-  --button-hover-color: #6264a4;
-  --line-color: #c3c3c3;
-  --brand-color: #7040ff;
+  /* Dark editor-style palette. Every color used anywhere in the app should
+     come from one of these custom properties instead of a raw value, so the
+     whole theme can be adjusted from this one place. */
+  --color-bg: #0c0f0e;
+  --color-surface: #141817;
+  --color-surface-raised: #1b211f;
+  --color-surface-hover: #232b28;
+
+  --color-border: #2b3531;
+  --color-border-strong: #3a4842;
+
+  --color-text: #f2f7f4;
+  --color-text-muted: #99a69f;
+  --color-text-disabled: #65716b;
+
+  --color-accent: #8ef0b0;
+  --color-accent-hover: #a4f6bf;
+  --color-accent-active: #6ddb95;
+  --color-accent-soft: rgba(142, 240, 176, 0.14);
+
+  --color-disabled-region: rgba(74, 104, 88, 0.56);
+  --color-selection-region: rgba(142, 240, 176, 0.22);
+  --color-playhead: #b7ffcf;
+
+  --color-danger: #ff8e8e;
+
+  /* Destructive intent for the content-cut/"remove audio" action only - see
+     `.selection-action-button--remove:hover`. */
+  --color-remove: #ff7373;
+  --color-remove-soft: rgba(255, 115, 115, 0.14);
+
   --radius: 0.5rem;
+
+  /* Reserves space at the bottom of the page for the docked waveform
+     section (see `.waveform-section`) so it never covers the end of the
+     transcript/controls workspace above it. Kept deliberately small now
+     that the waveform toolbar is a single compact row (see the
+     `max-width: 40rem` override below for the stacked/wrapped variant). */
+  --waveform-dock-height: 16rem;
 }
 
 *, *::before, *::after {
@@ -22,55 +53,101 @@ html {
 body {
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: var(--background-color);
-  color: var(--text-color);
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font-family: Poppins, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  
 }
 
 input, button, select, textarea {
   font: inherit;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--line-color);
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.5rem;
   font-size: 1rem;
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
-button {
-  background-color: var(--button-color);
-  border: none;
-  color: white;
+input[type="file"]::file-selector-button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.4rem;
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
   cursor: pointer;
-  transition: background-color 0.3s ease;
 }
 
-button:hover {
-  background-color: var(--button-hover-color);
+/* Baseline/secondary button: a dark raised surface with a green hover
+   border, used for every button unless it opts into `.cta` (primary). */
+button {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
+button:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-accent);
+}
+
+button:active:not(:disabled) {
+  background-color: var(--color-surface);
+  border-color: var(--color-accent-active);
+}
+
+button:disabled {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* Primary action (Export Audio): filled with the green accent. */
 button.cta {
-  background-color: var(--brand-color);
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #08100b;
+  font-weight: 600;
+}
+
+button.cta:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+button.cta:active:not(:disabled) {
+  background-color: var(--color-accent-active);
+  border-color: var(--color-accent-active);
+}
+
+button.cta:disabled {
+  background-color: var(--color-disabled-region);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-disabled);
 }
 
 .App {
   width: min(100%, 60rem);
   margin: 0 auto;
   padding: 1rem;
+  padding-bottom: var(--waveform-dock-height);
 
-  display: grid;
-  grid-template-areas: "header header" "main aside" "editor editor";
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
+  overflow-x: hidden;
 }
 
 .App header {
-  grid-area: header;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  border: 1px solid var(--line-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 1rem 1.5rem;
   margin-top: 5rem;
@@ -80,9 +157,20 @@ header h1 {
   margin-right: auto;
 }
 
-.App main {
-  grid-area: main;
-  border: 1px solid var(--line-color);
+/* Main workspace: transcript panel + action sidebar, side by side on
+   desktop. This is the only grid row that still splits into two columns -
+   the waveform section below it always spans the full width instead. */
+.editor-layout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.transcript-panel {
+  min-width: 0;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 1rem;
   display: flex;
@@ -90,13 +178,19 @@ header h1 {
   gap: 1rem;
 }
 
+@media (max-width: 40rem) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 audio {
   width: 100%;
-  accent-color: var(--brand-color);
+  accent-color: var(--color-accent);
 }
 
 audio::-webkit-media-controls-panel {
-  background-color: var(--surface-color);
+  background-color: var(--color-surface);
 }
 
 .transcript {
@@ -106,9 +200,17 @@ audio::-webkit-media-controls-panel {
 
 .transcript-hint {
   font-size: 0.9rem;
-  opacity: 0.7;
+  color: var(--color-text-muted);
 }
 
+.detection-summary {
+  font-size: 0.9rem;
+  color: var(--color-accent);
+}
+
+/* Clicking a word seeks (see TranscriptEditor's click-vs-drag detection);
+   text selection remains the primary interaction, so the cursor stays a
+   text caret and the hover cue stays subtle rather than button-like. */
 .transcript-word {
   cursor: text;
   user-select: text;
@@ -116,9 +218,251 @@ audio::-webkit-media-controls-panel {
   padding: 0.05rem 0.1rem;
 }
 
+.transcript-word:hover {
+  background: var(--color-accent-soft);
+}
+
 .transcript-word--excluded {
   text-decoration: line-through;
-  opacity: 0.45;
+  color: var(--color-text-disabled);
+}
+
+.transcript-word--partial {
+  text-decoration: underline dotted;
+  color: var(--color-text-muted);
+}
+
+.transcript-word--active {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.transport-icon-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transport-controls__time {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.transport-controls__source-time {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Generic icon wrapper: Icon.jsx inlines the real markup of an existing
+   `src/icons` SVG (with its hardcoded fill swapped for `currentColor`), so
+   the exact same file can render muted, accented, or destructive-red just
+   by changing the surrounding button's `color` - no CSS mask involved. */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The play triangle's own visual weight sits slightly left of its
+   mathematical center; nudging it right by a hair reads as better centered
+   than a pixel-perfect box alignment would. */
+.icon--play {
+  transform: translateX(1px);
+}
+
+/* Round playback-cursor buttons (start/-5s/play-pause/+5s/end). Secondary
+   controls all share one fixed size; the primary play/pause button is
+   larger and uses the green accent fill instead of a dark surface. */
+.playback-icon-button {
+  width: 42px;
+  height: 42px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  flex-shrink: 0;
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.playback-icon-button .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.playback-icon-button:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.playback-icon-button:active:not(:disabled) {
+  background-color: var(--color-surface);
+  border-color: var(--color-accent-active);
+}
+
+.playback-icon-button:disabled {
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-disabled);
+}
+
+.playback-icon-button--primary {
+  width: 54px;
+  height: 54px;
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #08100b;
+}
+
+.playback-icon-button--primary .icon {
+  width: 24px;
+  height: 24px;
+}
+
+.playback-icon-button--primary:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.playback-icon-button--primary:active:not(:disabled) {
+  background-color: var(--color-accent-active);
+  border-color: var(--color-accent-active);
+}
+
+.playback-icon-button--primary:disabled {
+  background-color: var(--color-disabled-region);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-disabled);
+}
+
+/* Fixed, full viewport-width dock at the bottom of the screen - deliberately
+   outside `.editor-layout` and *not* constrained by the app shell's
+   `max-width`. This positioning is intentional and must be preserved: do
+   not move this into the page grid, make it static/sticky, or shrink its
+   width to match `.App`. */
+.waveform-section {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  backdrop-filter: blur(15px);
+}
+
+.waveform-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Single compact row: an optional status message, the playback transport
+   (visually centered via the symmetric 1fr/auto/1fr columns), and the zoom
+   percentage - see WaveformEditor.jsx. */
+.waveform-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.2rem;
+}
+
+.waveform-toolbar-time {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.waveform-transport {
+  display: flex;
+  justify-content: center;
+}
+
+.waveform-zoom {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-align: right;
+  justify-self: end;
+}
+
+.waveform-editor__status {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waveform-editor__status--error {
+  color: var(--color-danger);
+}
+
+/* Height agrees with WaveSurfer's own `height` option (see useWaveSurfer.js)
+   so CSS and the actual rendered waveform never fight each other; the
+   min-height just avoids a layout jump while the file is still decoding.
+   Horizontal scrolling when zoomed in is handled by WaveSurfer's own
+   internal scroll container (in its shadow DOM), so no overflow-x rule is
+   needed here. */
+.waveform-editor__surface {
+  position: relative;
+  min-height: 160px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.waveform-editor__timeline {
+  min-height: 28px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.waveform-region--excluded {
+  border-left: 2px solid var(--color-accent-active) !important;
+  border-right: 2px solid var(--color-accent-active) !important;
+  opacity: 0.85;
+}
+
+.waveform-region--temp {
+  border-left: 2px solid var(--color-accent) !important;
+  border-right: 2px solid var(--color-accent) !important;
 }
 
 .selection-toolbar {
@@ -128,59 +472,91 @@ audio::-webkit-media-controls-panel {
   align-items: center;
   gap: 0.4rem;
   padding: 0.4rem;
-  background-color: var(--surface-color);
-  border: 1px solid var(--line-color);
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.45);
 }
 
-.selection-toolbar button {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  white-space: nowrap;
+/* Round icon buttons for the Remove/Restore actions - shared by the
+   transcript and waveform selection toolbars (both render this same
+   SelectionToolbar component), intentionally scoped to this one class
+   rather than making every button in the app round. */
+.selection-action-button {
+  width: 40px;
+  height: 40px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  flex-shrink: 0;
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
 }
 
-.selection-toolbar__close {
-  background: transparent;
-  color: var(--text-color);
-  padding: 0.35rem 0.5rem;
+.selection-action-button:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
 }
 
-.selection-toolbar__close:hover {
-  background: rgba(0, 0, 0, 0.08);
+/* Only the content-cut ("remove audio") action gets the destructive red
+   hover - the undo/"restore audio" action keeps the normal green accent. */
+.selection-action-button--remove:hover:not(:disabled) {
+  color: var(--color-remove);
+  border-color: var(--color-remove);
+  background: var(--color-remove-soft);
+}
+
+.selection-action-button--restore:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 aside.controls {
-  grid-area: aside;
   display: flex;
   flex-direction: column;
   gap: .25rem;
-  border: 1px solid var(--line-color);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: 1rem;
 }
 
-.editor {
-  grid-area: editor;
-  border: 1px solid var(--line-color);
-  border-radius: var(--radius);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+/* Secondary automatic-detection actions (Remove Silences / Remove Retakes):
+   dark surface by default, green border/hover to distinguish them from the
+   plain baseline button style without competing with the primary CTA. */
+button.secondary {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
 }
 
-.audio-compare {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+button.secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
 }
 
-.audio-compare-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background-color: var(--surface-color);
-  border-radius: var(--radius);
-  padding: 1rem;
+@media (max-width: 40rem) {
+  /* The toolbar wraps into three stacked, centered rows here instead of one
+     line, so the fixed dock needs a bit more reserved bottom padding. */
+  :root {
+    --waveform-dock-height: 22rem;
+  }
+
+  .waveform-section {
+    border-radius: 0;
+  }
+
+  .waveform-toolbar {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    min-height: auto;
+  }
+
+  .waveform-zoom {
+    justify-self: center;
+    text-align: center;
+  }
 }
