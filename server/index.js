@@ -52,31 +52,34 @@ app.post("/api/upload", uploadAudio, async (req, res) => {
   }
 });
 
-// Physically renders a silence-free copy of the file for the "before/after"
-// comparison player. This is a separate, submission-based feature and stays
-// untouched by the non-destructive retake editor below.
+// Detection only: figures out which time ranges are likely silence, but
+// never touches the audio file itself - exactly like /api/remove-retakes
+// below. The frontend adds these as suggested excluded segments to its own
+// non-destructive editing state and only calls /api/export-audio once the
+// user is happy with the combined edit list.
 app.post("/api/remove-silences", async (req, res) => {
-  const { words, path } = req.body
-
-  const silences = findSilencesFromWords(words)
-  const duration = words[words.length - 1]?.end ?? 0;
-  const excludedSegments = normalizeExcludedSegments(silences, duration);
-  const keepSegments = getKeepSegments(excludedSegments, duration);
-
-  const outputFilename = `cleaned-${Date.now()}.mp3`;
-  const outputPath = `exports/${outputFilename}`;
-
   try {
-    await renderKeepSegments(path, keepSegments, outputPath);
-    res.json({
+    const { words } = req.body;
+
+    if (!Array.isArray(words) || words.length === 0) {
+      return res.status(400).json({
+        error: "No transcript words provided",
+      });
+    }
+
+    const silences = findSilencesFromWords(words);
+
+    return res.json({
       silences,
-      url: `http://localhost:3000/exports/${outputFilename}`,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to cut silences" });
+  } catch (error) {
+    console.error("Silence detection failed:", error);
+
+    return res.status(500).json({
+      error: "Failed to detect silences",
+    });
   }
-})
+});
 
 // Detection only: figures out which word/time ranges are likely retakes, but
 // never touches the audio file itself. The frontend keeps its own editable
