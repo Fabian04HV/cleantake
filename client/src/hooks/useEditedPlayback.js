@@ -25,6 +25,15 @@ export function useEditedPlayback({ audioRef, words, excludedSegments }) {
   const frameRef = useRef(null);
   const lastLabelUpdateRef = useRef(0);
 
+  // `HTMLMediaElement.play()` returns a Promise that can stay pending for a
+  // while (e.g. while the browser is still fetching/decoding, since the
+  // shared <audio> only uses `preload="metadata"`). `paused` itself flips
+  // synchronously, but some browsers only fully/reliably honor a `pause()`
+  // issued *while that promise is still in flight* once it has settled -
+  // which is exactly the "Play always works, Pause doesn't" pattern this
+  // tracks and guards against in `pause()` below.
+  const pendingPlayRef = useRef(null);
+
   useEffect(() => {
     excludedSegmentsRef.current = excludedSegments;
   }, [excludedSegments]);
@@ -161,14 +170,48 @@ export function useEditedPlayback({ audioRef, words, excludedSegments }) {
       return;
     }
 
-    audio.play().catch(() => {
-      // Ignore autoplay/interaction rejections; the media element's own
-      // `pause` state (unchanged) already reflects reality.
-    });
+    const playPromise = audio.play();
+    pendingPlayRef.current = playPromise ?? null;
+
+    if (playPromise && typeof playPromise.then === "function") {
+      playPromise
+        .catch(() => {
+          // Ignore autoplay/interaction rejections (including the
+          // AbortError from a `pause()` that arrived while this request
+          // was still pending); the media element's own `paused` state
+          // already reflects reality either way.
+        })
+        .finally(() => {
+          if (pendingPlayRef.current === playPromise) {
+            pendingPlayRef.current = null;
+          }
+        });
+    }
   }, [audioRef, syncFromCurrentTime]);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Always issue it immediately - `paused` must flip right away for a
+    // responsive button/Spacebar. See the `pendingPlayRef` comment above
+    // for why it may also need reasserting a moment later.
+    audio.pause();
+
+    const pendingPlay = pendingPlayRef.current;
+    if (pendingPlay && typeof pendingPlay.then === "function") {
+      pendingPlay.catch(() => {}).finally(() => {
+        // `pendingPlayRef` having since moved on to a *different* promise
+        // means a newer `play()` call (e.g. the user pressing Play again
+        // before this settled) is now the active request - reasserting
+        // pause here would incorrectly stop audio the user just legitimately
+        // resumed, so only reassert while this is still the latest request.
+        const newerPlayIsActive = pendingPlayRef.current !== null && pendingPlayRef.current !== pendingPlay;
+        if (!newerPlayIsActive) {
+          audioRef.current?.pause();
+        }
+      });
+    }
   }, [audioRef]);
 
   const togglePlayback = useCallback(() => {

@@ -53,7 +53,13 @@ export function useWaveSurfer({ containerRef, timelineContainerRef, mediaRef, ur
       progressColor: PROGRESS_COLOR,
       cursorColor: CURSOR_COLOR,
       cursorWidth: 2,
-      height: 160,
+      // "auto" fills whatever height the container element actually has
+      // (see `.waveform-editor__surface` in index.css) and, per WaveSurfer's
+      // own renderer, keeps re-rendering at the new height through its
+      // built-in ResizeObserver whenever that container is resized - so the
+      // vertical-resize handle in WaveformEditor never has to destroy/
+      // recreate this instance or manually poke its canvases.
+      height: "auto",
       barWidth: 2,
       barGap: 1,
       barRadius: 2,

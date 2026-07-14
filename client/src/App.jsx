@@ -4,6 +4,7 @@ import WaveformEditor from './WaveformEditor.jsx'
 import SelectionToolbar from './SelectionToolbar.jsx'
 import { useEditedPlayback } from './hooks/useEditedPlayback.js'
 import { usePlaybackShortcuts } from './hooks/usePlaybackShortcuts.js'
+import { useResizableWaveformHeight } from './hooks/useResizableWaveformHeight.js'
 import { excludeTimeRange, getTimeRangeState, includeTimeRange, normalizeExcludedSegments } from './utils/audioSegments.js'
 
 function App() {
@@ -46,6 +47,18 @@ function App() {
   // waveform selection be open - and rendering their own actions - at the
   // same time.
   const [activeSelection, setActiveSelection] = useState(null);
+
+  // The single shared height (px) for the fixed WaveformEditor dock, the
+  // page's bottom spacer, and the waveform drawing area - see
+  // useResizableWaveformHeight and the `.waveform-section`/`.waveform-editor`
+  // flex layout in index.css.
+  const {
+    height: waveformPanelHeight,
+    handlePointerDown: handleWaveformResizePointerDown,
+    handlePointerMove: handleWaveformResizePointerMove,
+    handlePointerUp: handleWaveformResizePointerUp,
+    handlePointerCancel: handleWaveformResizePointerCancel,
+  } = useResizableWaveformHeight();
 
   // The one authoritative playback media element, shared between the
   // <audio> tag, WaveSurfer, and every control surface.
@@ -342,38 +355,70 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <header>
-        <h1>Clean Take AI</h1>  
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={(e) => {
-            handleUpload(e.target.files[0]);
-          }}
-        />
-        {isUploading && <p>Uploading...</p>}
-      </header>
-      {/* The audio element is the single authoritative playback surface for
-          both WaveSurfer and every custom control; it is never shown with
-          native browser controls, and there is never a second one. */}
-      <audio ref={audioRef} src={uploadedAudio?.url} preload="metadata" />
-      <div className="editor-layout">
+    <>
+      {/* Full viewport-width navbar, deliberately outside `.App`'s
+          `max-width` shell (same pattern as `.waveform-section` below):
+          heading pinned left, upload centered in the *entire* bar via the
+          symmetric 1fr/auto/1fr columns, Export pinned right. */}
+      <nav className="navbar">
+        <h1 className="navbar__heading">Clean Take AI</h1>
+        <div className="navbar__upload">
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={(e) => {
+              handleUpload(e.target.files[0]);
+            }}
+          />
+          {isUploading && <span className="navbar__upload-status">Uploading...</span>}
+        </div>
+        <button className="cta navbar__export" onClick={handleExportAudio} disabled={!uploadedAudio || isExporting}>
+          {isExporting ? 'Exporting...' : 'Export Audio'}
+        </button>
+      </nav>
+      <div className="App">
+        {/* The audio element is the single authoritative playback surface for
+            both WaveSurfer and every custom control; it is never shown with
+            native browser controls, and there is never a second one. */}
+        <audio ref={audioRef} src={uploadedAudio?.url} preload="metadata" />
         <main className="transcript-panel">
           {uploadedAudio && (
             <>
-              <h2>Transcript</h2>
-              {hasDetectedRetakes && (
-                <p className="detection-summary">
-                  {retakes.length} retake{retakes.length === 1 ? '' : 's'} detected
-                </p>
-              )}
-              {hasDetectedSilences && (
-                <p className="detection-summary">
-                  {silences.length} silence{silences.length === 1 ? '' : 's'} detected
-                </p>
-              )}
-              <p className="transcript-hint">Select any words to remove or restore them.</p>
+              <div className="transcript-header">
+                <div className="transcript-header__title">
+                  <h2>Transcript</h2>
+                  {hasDetectedRetakes && (
+                    <span className="detection-summary">
+                      {retakes.length} retake{retakes.length === 1 ? '' : 's'} detected
+                    </span>
+                  )}
+                  {hasDetectedSilences && (
+                    <span className="detection-summary">
+                      {silences.length} silence{silences.length === 1 ? '' : 's'} detected
+                    </span>
+                  )}
+                </div>
+                <div className="transcript-header__actions">
+                  <button className="secondary" onClick={handleRemoveSilences} disabled={!uploadedAudio || isRemovingSilences}>
+                    {isRemovingSilences
+                      ? 'Detecting Silences...'
+                      : hasDetectedSilences
+                      ? 'Re-run Remove Silences'
+                      : 'Remove Silences'}
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={handleRemoveRetakes}
+                    disabled={!uploadedAudio || isDetectingRetakes}
+                  >
+                    {isDetectingRetakes
+                      ? 'Detecting Retakes...'
+                      : hasDetectedRetakes
+                      ? 'Re-run Remove Retakes'
+                      : 'Remove Retakes'}
+                  </button>
+                </div>
+              </div>
               <TranscriptEditor
                 key={uploadedAudio.url}
                 words={uploadedAudio.words}
@@ -387,64 +432,56 @@ function App() {
             </>
           )}
         </main>
-        <aside className="controls">
-          <button className="secondary" onClick={handleRemoveSilences} disabled={!uploadedAudio || isRemovingSilences}>
-            {isRemovingSilences
-              ? 'Detecting Silences...'
-              : hasDetectedSilences
-              ? 'Re-run Remove Silences'
-              : 'Remove Silences'}
-          </button>
-          <button
-            className="secondary"
-            onClick={handleRemoveRetakes}
-            disabled={!uploadedAudio || isDetectingRetakes}
-          >
-            {isDetectingRetakes
-              ? 'Detecting Retakes...'
-              : hasDetectedRetakes
-              ? 'Re-run Remove Retakes'
-              : 'Remove Retakes'}
-          </button>
-          <button className="cta" onClick={handleExportAudio} disabled={!uploadedAudio || isExporting}>
-            {isExporting ? 'Exporting...' : 'Export Audio'}
-          </button>
-        </aside>
+        {uploadedAudio && (
+          <section className="waveform-section" style={{ height: `${waveformPanelHeight}px` }}>
+            {/* Drag this to resize the whole dock - see
+                useResizableWaveformHeight for the pointer-capture drag
+                math, clamping, and localStorage persistence. */}
+            <div
+              className="waveform-resize-handle"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize waveform editor"
+              onPointerDown={handleWaveformResizePointerDown}
+              onPointerMove={handleWaveformResizePointerMove}
+              onPointerUp={handleWaveformResizePointerUp}
+              onPointerCancel={handleWaveformResizePointerCancel}
+            >
+              <span className="waveform-resize-handle__grip" aria-hidden="true" />
+            </div>
+            <WaveformEditor
+              key={uploadedAudio.url}
+              audioRef={audioRef}
+              url={uploadedAudio.url}
+              excludedSegments={excludedSegments}
+              activeSelection={activeSelection}
+              onSelectionChange={handleWaveformSelectionChange}
+              onSeek={playback.seekToSourceTime}
+              isPlaying={playback.isPlaying}
+              currentEditedTime={playback.currentEditedTime}
+              editedDuration={playback.editedDuration}
+              currentSourceTime={playback.currentSourceTime}
+              sourceDuration={playback.sourceDuration}
+              onTogglePlayback={playback.togglePlayback}
+              seekToStart={playback.seekToStart}
+              seekBy={playback.seekBy}
+              seekToEnd={playback.seekToEnd}
+              disabled={!uploadedAudio}
+            />
+          </section>
+        )}
+        {/* The one and only SelectionToolbar in the app: whichever editor
+            last reported a selection (see activeSelection above) owns it,
+            so a transcript selection and a waveform selection can never
+            both show their own Remove/Restore actions at the same time. */}
+        <SelectionToolbar
+          selection={selectionForToolbar}
+          onExclude={handleSelectionExclude}
+          onInclude={handleSelectionInclude}
+        />
       </div>
-      {uploadedAudio && (
-        <section className="waveform-section">
-          <WaveformEditor
-            key={uploadedAudio.url}
-            audioRef={audioRef}
-            url={uploadedAudio.url}
-            excludedSegments={excludedSegments}
-            activeSelection={activeSelection}
-            onSelectionChange={handleWaveformSelectionChange}
-            onSeek={playback.seekToSourceTime}
-            isPlaying={playback.isPlaying}
-            currentEditedTime={playback.currentEditedTime}
-            editedDuration={playback.editedDuration}
-            currentSourceTime={playback.currentSourceTime}
-            sourceDuration={playback.sourceDuration}
-            onTogglePlayback={playback.togglePlayback}
-            seekToStart={playback.seekToStart}
-            seekBy={playback.seekBy}
-            seekToEnd={playback.seekToEnd}
-            disabled={!uploadedAudio}
-          />
-        </section>
-      )}
-      {/* The one and only SelectionToolbar in the app: whichever editor last
-          reported a selection (see activeSelection above) owns it, so a
-          transcript selection and a waveform selection can never both show
-          their own Remove/Restore actions at the same time. */}
-      <SelectionToolbar
-        selection={selectionForToolbar}
-        onExclude={handleSelectionExclude}
-        onInclude={handleSelectionInclude}
-      />
-  </div>
-);
+    </>
+  );
 }
 
 export default App;
